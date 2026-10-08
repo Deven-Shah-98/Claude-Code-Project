@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from . import pipeline
+from . import pipeline, pooled
 from .geo import haversine_miles
 from .synthetic import SCResult, prepare_wide
 
@@ -16,9 +18,11 @@ FEW_ZIPS = 5
 MAP_RADIUS_MI = 15.0
 ROBUST_DENSITY = 3.0       # donor land area cap (x treated median) for the robustness re-run
 ROBUST_MIN_DONORS = 200    # below this the robustness pool is too thin to judge anything
+GRID_MIN_AGREE = 0.75      # share of grid specifications that must share the primary's sign
 
 
-def verdict(res: SCResult | None, meta: dict | None, opened_year: int) -> tuple[str, list[str]]:
+def verdict(res: SCResult | None, meta: dict | None, opened_year: int,
+            robust_reason: str | None = None) -> tuple[str, list[str]]:
     """Honest label + caveats. Order matters: data problems > pandemic > significance."""
     if res is None:
         return "no-data", ["Not enough pre-opening or ZIP-level data to estimate."]
@@ -27,17 +31,33 @@ def verdict(res: SCResult | None, meta: dict | None, opened_year: int) -> tuple[
         caveats.append(f"Only {meta['pre_months']} months of pre-opening history (60 preferred).")
     if res.n_treated < FEW_ZIPS:
         caveats.append(f"Only {res.n_treated} ZIP codes in the treated area.")
-    pandemic = opened_year >= PANDEMIC_START_YEAR
-    if pandemic:
+    if meta.get("treated_radius", 3.0) > 3.0:
+        caveats.append(f"Treated area widened to {meta['treated_radius']:g} miles "
+                       "because too few nearby ZIPs had complete data.")
+    if opened_year >= PANDEMIC_START_YEAR:
         caveats.append("Post-opening window overlaps the 2020-22 pandemic shift between urban "
                        "cores and suburbs.")
-    if pandemic:
+        if res.p_value_dense is not None:
+            caveats.append(f"Among similarly sized ZIPs in the same years, an effect this large "
+                           f"shows up about {res.p_value_dense * 100:.0f}% of the time "
+                           f"(dense-area placebo p = {res.p_value_dense:.2f}).")
         return "confounded", caveats
-    if res.p_value is not None and res.p_value <= 0.05 and not meta["low_confidence"]:
-        return "signal", caveats
+    label = "inconclusive"
     if res.p_value is not None and res.p_value <= 0.10:
-        return "suggestive", caveats
-    return "inconclusive", caveats
+        label = "suggestive"
+    if res.p_value is not None and res.p_value <= 0.05 and not meta["low_confidence"]:
+        label = "signal"
+    if label != "inconclusive":
+        grid = meta.get("grid_summary") or {}
+        if grid.get("n", 0) >= 6 and grid["share_same_sign"] < GRID_MIN_AGREE:
+            caveats.append(f"Unstable across specifications: only "
+                           f"{grid['share_same_sign'] * 100:.0f}% of {grid['n']} alternative "
+                           "radius/window/donor choices keep the same direction.")
+            label = "suggestive" if label == "signal" else "inconclusive"
+        if robust_reason:
+            caveats.append(robust_reason)
+            label = "suggestive" if label == "signal" else "inconclusive"
+    return label, caveats
 
 
 def robustness_downgrade(primary: SCResult, alt: SCResult) -> str | None:
@@ -89,52 +109,108 @@ def chart_series(res: SCResult, step: int = 3, lo: int = -60, hi: int = 36) -> d
     return {"months": rel, "actual": idx(res.treated_path), "synthetic": idx(res.synthetic_path)}
 
 
+_STATE: dict = {}
+
+
+def _log_band(effect_pct: float, placebos: list[float]) -> tuple[float, float]:
+    """Effect +/- 1.96 placebo standard deviations (log scale), back in percent."""
+    sd = float(np.log1p(np.asarray(placebos) / 100).std(ddof=1))
+    mid = float(np.log1p(effect_pct / 100))
+    return (float((np.exp(mid - 1.96 * sd) - 1) * 100), float((np.exp(mid + 1.96 * sd) - 1) * 100))
+
+
+def _process_venue(args: tuple) -> dict:
+    """Worker: one venue's estimate, robustness, JSON entry, ZIP series and placebo draws."""
+    v, n_placebo = args
+    zctas, wide = _STATE["zctas"], _STATE["wide"]
+    res = meta = None
+    err = ""
+    try:
+        res, meta = pipeline.venue_synthetic(v, zctas, wide, n_placebo=n_placebo, grid=True)
+    except ValueError as e:
+        err = str(e)
+    robust = reason = None
+    if res is not None and res.p_value is not None and res.p_value <= 0.10 \
+            and int(v["opened_year"]) < PANDEMIC_START_YEAR:
+        alt, _ = pipeline.venue_synthetic(v, zctas, wide, n_placebo=n_placebo,
+                                          density_match=ROBUST_DENSITY)
+        robust = {"effect_pct": round(alt.effect_pct, 2), "p_value": round(alt.p_value, 4),
+                  "n_donors": alt.n_donors}
+        reason = robustness_downgrade(res, alt)
+    label, caveats = verdict(res, meta, int(v["opened_year"]), reason)
+    entry = {
+        "id": v["venue_id"], "name": v["name"], "team": v["team"], "league": v["league"],
+        "city": v["city"], "state": v["state"], "lat": float(v["lat"]), "lon": float(v["lon"]),
+        "opened_year": int(v["opened_year"]), "opened_month": pipeline.opening_month(v),
+        "wikidata": v.get("wikidata_qid"), "verdict": label, "caveats": caveats,
+    }
+    placebos = {}
+    if res is not None:
+        entry["sc"] = {**{k: (None if x is None else round(float(x), 4))
+                          for k, x in res.as_dict().items()},
+                       "pre_months": meta["pre_months"], "treated_radius": meta["treated_radius"]}
+        entry["robustness"] = robust
+        entry["grid"] = {"rows": meta["grid"], "summary": meta["grid_summary"]}
+        entry["chart"] = chart_series(res)
+        entry["donors"] = [{"zip": z, "w": round(float(w), 3)}
+                           for z, w in res.weights.head(5).items()]
+        entry["band_pct"] = [round(x, 2) for x in _log_band(res.effect_pct, res.placebo_effects)]
+        placebos = {"placebo_effects": res.placebo_effects,
+                    "placebo_effects_dense": res.placebo_effects_dense}
+    else:
+        entry["error"] = err
+    series = zip_series(v, zctas, wide) if (res is not None or label == "no-data") else None
+    return {"entry": entry, "series": series, "placebos": placebos}
+
+
+def pooled_summary(entries: list[dict], placebos: dict[str, dict]) -> dict:
+    """Pool scorable venues; pandemic-window venues are reported separately, never mixed in."""
+    def rows(pred):
+        return [{**e["sc"], "id": e["id"], "league": e["league"], "effect_pct": e["sc"]["effect_pct"],
+                 **placebos[e["id"]]} for e in entries if "sc" in e and pred(e)]
+
+    main = rows(lambda e: e["verdict"] != "confounded")
+    pandemic = rows(lambda e: e["verdict"] == "confounded")
+    return {
+        "n_venues_total": len(entries),
+        "n_scored": len(main) + len(pandemic),
+        "all": pooled.pool(main),
+        "dense_null": pooled.pool(main, "placebo_effects_dense"),
+        "by_league": pooled.by_group(main, "league"),
+        "pandemic_window": pooled.pool(pandemic) if len(pandemic) >= 3 else {"n": len(pandemic)},
+        "forest": [{"id": e["id"], "name": e["name"], "league": e["league"], "year": e["opened_year"],
+                    "effect_pct": e["sc"]["effect_pct"], "band_pct": e["band_pct"],
+                    "verdict": e["verdict"]} for e in entries if "sc" in e],
+    }
+
+
 def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo: int = 40,
-               only: str | None = None) -> pd.DataFrame:
+               only: str | None = None, workers: int = 4) -> pd.DataFrame:
     out_dir = Path(out_dir)
     (out_dir / "venues").mkdir(parents=True, exist_ok=True)
-    wide = prepare_wide(zhvi)
     venues = pipeline.load_venues()
     if only:
         venues = venues[venues["venue_id"] == only]
-    summary = []
-    for _, v in venues.iterrows():
-        res = meta = None
-        try:
-            res, meta = pipeline.venue_synthetic(v, zctas, wide, n_placebo=n_placebo)
-        except ValueError as e:
-            err = str(e)
-        label, caveats = verdict(res, meta, int(v["opened_year"]))
-        robust = None
-        if label in ("signal", "suggestive"):
-            alt, _ = pipeline.venue_synthetic(v, zctas, wide, n_placebo=n_placebo,
-                                              density_match=ROBUST_DENSITY)
-            robust = {"effect_pct": round(alt.effect_pct, 2), "p_value": round(alt.p_value, 4),
-                      "n_donors": alt.n_donors}
-            reason = robustness_downgrade(res, alt)
-            if reason:
-                caveats.append(reason)
-                label = "suggestive" if label == "signal" else "inconclusive"
-        entry = {
-            "id": v["venue_id"], "name": v["name"], "team": v["team"], "league": v["league"],
-            "city": v["city"], "state": v["state"], "lat": float(v["lat"]),
-            "lon": float(v["lon"]), "opened_year": int(v["opened_year"]),
-            "wikidata": v.get("wikidata_qid"), "verdict": label, "caveats": caveats,
-        }
-        if res is not None:
-            entry["sc"] = {**{k: (None if x is None else round(float(x), 4))
-                              for k, x in res.as_dict().items()},
-                           "pre_months": meta["pre_months"]}
-            entry["robustness"] = robust
-            entry["chart"] = chart_series(res)
-            entry["donors"] = [{"zip": z, "w": round(float(w), 3)}
-                               for z, w in res.weights.head(5).items()]
-        else:
-            entry["error"] = err
-        if res is not None or label == "no-data":
-            (out_dir / "venues" / f"{v['venue_id']}.json").write_text(
-                json.dumps(zip_series(v, zctas, wide), separators=(",", ":")))
-        summary.append(entry)
-        print(f"exported {v['venue_id']}: {label}", flush=True)
-    (out_dir / "venues.json").write_text(json.dumps(summary, separators=(",", ":")))
-    return pd.DataFrame(summary)
+    _STATE.update(zctas=zctas, wide=prepare_wide(zhvi))   # inherited by forked workers
+    jobs = [(v, n_placebo) for _, v in venues.iterrows()]
+    if workers > 1 and len(jobs) > 1:
+        with ProcessPoolExecutor(workers, mp_context=mp.get_context("fork")) as ex:
+            results = list(ex.map(_process_venue, jobs))
+    else:
+        results = [_process_venue(j) for j in jobs]
+    entries, placebos = [], {}
+    for r in results:
+        e = r["entry"]
+        entries.append(e)
+        placebos[e["id"]] = r["placebos"]
+        if r["series"] is not None:
+            (out_dir / "venues" / f"{e['id']}.json").write_text(
+                json.dumps(r["series"], separators=(",", ":")))
+        print(f"exported {e['id']}: {e['verdict']}", flush=True)
+    (out_dir / "venues.json").write_text(json.dumps(entries, separators=(",", ":")))
+    (out_dir / "pooled.json").write_text(json.dumps(pooled_summary(entries, placebos),
+                                                    separators=(",", ":")))
+    proc = Path("data/processed")
+    proc.mkdir(parents=True, exist_ok=True)
+    (proc / "placebos.json").write_text(json.dumps(placebos))
+    return pd.DataFrame(entries)

@@ -29,6 +29,7 @@ def main(argv=None) -> int:
     ex.add_argument("--out", default="web/public/data")
     ex.add_argument("--placebos", type=int, default=40)
     ex.add_argument("--venue", help="export a single venue_id (default: all)")
+    ex.add_argument("--workers", type=int, default=4, help="parallel venues")
     args = p.parse_args(argv)
 
     if args.cmd == "serve":
@@ -46,7 +47,8 @@ def main(argv=None) -> int:
     if args.cmd == "export":
         from .export import export_all
 
-        export_all(zhvi, zctas, args.out, n_placebo=args.placebos, only=args.venue)
+        export_all(zhvi, zctas, args.out, n_placebo=args.placebos, only=args.venue,
+                   workers=args.workers)
         return 0
     if args.cmd == "synth":
         return _synth(args, zhvi, zctas, venues)

@@ -7,9 +7,10 @@ import pandas as pd
 
 from .analysis import EffectEstimate, did_effect, event_study
 from .geo import DEFAULT_RINGS, assign_rings, haversine_miles
+from .robustness import robustness_grid, summarize
 from .synthetic import DEFAULT_PRE_MONTHS as SC_PRE
 from .synthetic import MIN_PRE_MONTHS as SC_MIN_PRE
-from .synthetic import SCResult, placebo_test, synthetic_control
+from .synthetic import SCResult, _window, placebo_test, synthetic_control
 
 DEFAULT_PRE_MONTHS = 36
 MIN_PRE_MONTHS = 24
@@ -52,14 +53,23 @@ def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
     return did_effect(panel, event_date, pre_months=pre, **kwargs), event_study(panel, event_date)
 
 
-def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
-                    month: int | None = None, treated_radius_mi: float = 3.0,
-                    exclusion_mi: float = 15.0, n_placebo: int = 40,
-                    post_months: int = 36, density_match: float | None = None) -> tuple[SCResult, dict]:
-    """Synthetic-control estimate with placebo p-value for one venue.
+MIN_TREATED_ZIPS = 5
+RADIUS_LADDER = (3.0, 5.0, 7.0)   # widen the treated area when too few ZIPs have complete data
+DENSE_RATIO = 3.0                 # "similar land area": within this factor of the treated median
 
-    Treated = ZIPs within `treated_radius_mi`; everything within `exclusion_mi` is barred from
-    the donor pool. Returns (result, meta) where meta records the pre-period actually used.
+
+def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
+                    month: int | None = None, treated_radius_mi: float | None = None,
+                    exclusion_mi: float = 15.0, n_placebo: int = 40, post_months: int = 36,
+                    density_match: float | None = None, grid: bool = False
+                    ) -> tuple[SCResult, dict]:
+    """Synthetic-control estimate with placebo p-values for one venue.
+
+    Treated = ZIPs within the treated radius (3 mi, widened to 5 then 7 if fewer than
+    MIN_TREATED_ZIPS have complete data, unless a radius is forced); everything within
+    `exclusion_mi` is barred from the donor pool. Besides the usual placebo p-value, a second one
+    draws placebos only from ZIPs of similar land area. With `grid`, the robustness specification
+    grid is computed too. Returns (result, meta).
     """
     event_date = pd.Timestamp(year=int(venue["opened_year"]),
                               month=month or opening_month(venue), day=1)
@@ -70,7 +80,13 @@ def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
         raise ValueError(f"insufficient pre-period: only {available} months of history "
                          f"before opening (need {SC_MIN_PRE})")
     d = haversine_miles(venue["lat"], venue["lon"], zctas["lat"].to_numpy(), zctas["lon"].to_numpy())
-    treated = list(zctas.loc[d < treated_radius_mi, "zip"])
+    _, _, complete = _window(wide, event_date, pre, post_months)
+    have = set(complete)
+    radii = (treated_radius_mi,) if treated_radius_mi else RADIUS_LADDER
+    for radius in radii:
+        treated = [z for z in zctas.loc[d < radius, "zip"] if z in have]
+        if len(treated) >= MIN_TREATED_ZIPS:
+            break
     excluded = list(zctas.loc[d < exclusion_mi, "zip"])
     if density_match and "land_sqmi" in zctas:
         # Urban cores and suburbs diverged after 2020, so only borrow from ZIPs of similar land
@@ -79,7 +95,18 @@ def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
         excluded = excluded + list(zctas.loc[zctas["land_sqmi"] > cap, "zip"])
     res = synthetic_control(wide, treated, event_date, pre_months=pre, post_months=post_months,
                             exclude_zips=excluded)
+    dense_pool = None
+    if "land_sqmi" in zctas:
+        med = zctas.loc[zctas["zip"].isin(treated), "land_sqmi"].median()
+        dense_pool = list(zctas.loc[zctas["land_sqmi"].between(med / DENSE_RATIO, med * DENSE_RATIO),
+                                    "zip"])
     res = placebo_test(wide, zctas, res, event_date, exclude_zips=excluded, pre_months=pre,
-                       post_months=post_months, n_placebo=n_placebo, exclusion_mi=exclusion_mi)
-    return res, {"pre_months": pre, "low_confidence": pre < SC_PRE,
-                 "density_matched": bool(density_match)}
+                       post_months=post_months, n_placebo=n_placebo, exclusion_mi=exclusion_mi,
+                       dense_pool=dense_pool)
+    meta = {"pre_months": pre, "low_confidence": pre < SC_PRE, "treated_radius": radius,
+            "density_matched": bool(density_match)}
+    if grid:
+        rows = robustness_grid(wide, zctas, d, event_date, pre, excluded, res, radius, post_months)
+        meta["grid"] = rows
+        meta["grid_summary"] = summarize(rows, res.effect_pct)
+    return res, meta

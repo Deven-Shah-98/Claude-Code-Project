@@ -9,7 +9,7 @@ Series are demeaned on the pre-period, so we match dynamics (trend/shape), not p
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -57,12 +57,16 @@ class SCResult:
     n_placebos: int = 0
     treated_path: pd.Series | None = None    # rel month -> demeaned log value of treated unit
     synthetic_path: pd.Series | None = None  # rel month -> demeaned log value of counterfactual
+    placebo_effects: list = field(default_factory=list)        # % effects of venue-less clusters
+    p_value_dense: float | None = None       # same test, placebos drawn from similar-size ZIPs
+    placebo_effects_dense: list = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {"effect_pct": self.effect_pct, "pre_rmspe": self.pre_rmspe,
                 "post_rmspe": self.post_rmspe, "n_treated": self.n_treated,
                 "n_donors": self.n_donors, "p_value": self.p_value,
-                "n_placebos": self.n_placebos}
+                "n_placebos": self.n_placebos, "p_value_dense": self.p_value_dense,
+                "n_placebos_dense": len(self.placebo_effects_dense)}
 
 
 def _window(wide: pd.DataFrame, event_date, pre_months: int, post_months: int):
@@ -108,43 +112,76 @@ def synthetic_control(wide: pd.DataFrame, treated_zips, event_date, pre_months: 
     )
 
 
-def placebo_test(wide: pd.DataFrame, zctas: pd.DataFrame, result: SCResult, event_date,
-                 exclude_zips=(), pre_months: int = DEFAULT_PRE_MONTHS, post_months: int = 36,
-                 n_placebo: int = 40, seed: int = 0, exclusion_mi: float = 15.0,
-                 fit_tolerance: float | None = None) -> SCResult:
-    """Attach a placebo p-value: how often a venue-less cluster shows an effect this large.
+def placebo_effects(wide: pd.DataFrame, zctas: pd.DataFrame, n_treated: int, event_date,
+                    exclude_zips=(), pre_months: int = DEFAULT_PRE_MONTHS, post_months: int = 36,
+                    n_placebo: int = 40, seed: int = 0, exclusion_mi: float = 15.0,
+                    pool_zips=None) -> list[float]:
+    """Effects (%) from running the same procedure on venue-less geographic clusters.
 
-    Placebo clusters are the `n_treated` nearest ZIPs to a random center. Two-sided
-    p = (1 + #{|placebo| >= |effect|}) / (1 + n_used).
-
-    `fit_tolerance` optionally drops placebos whose pre-fit exceeds that multiple of the real
-    unit's. It is off by default: in simulation it made p-values anti-conservative (24% false
-    positives at a nominal 10%, vs. 4% without it) because a very tight real fit discards
-    legitimate placebos.
+    A cluster is the `n_treated` nearest ZIPs to a random center. If `pool_zips` is given, centers
+    and cluster members come only from it (e.g. ZIPs of similar land area), while donors are still
+    drawn from everywhere except within `exclusion_mi` of the center and the real treated area.
     """
     _, _, complete = _window(wide, event_date, pre_months, post_months)
-    pool = [z for z in complete if z not in set(exclude_zips)]
-    geo = zctas.drop_duplicates("zip").set_index("zip").reindex(pool).dropna(subset=["lat", "lon"])
-    pool = list(geo.index)
+    banned = set(exclude_zips)
+    allowed = [z for z in complete if z not in banned]
+    geo = zctas.drop_duplicates("zip").set_index("zip").reindex(allowed).dropna(subset=["lat", "lon"])
+    allowed = list(geo.index)
     lat, lon = geo["lat"].to_numpy(), geo["lon"].to_numpy()
+    cand = np.arange(len(allowed))
+    if pool_zips is not None:
+        keep = set(pool_zips)
+        cand = np.array([i for i, z in enumerate(allowed) if z in keep])
+    if len(cand) < n_treated + 1:
+        return []
 
     rng = np.random.default_rng(seed)
     effects: list[float] = []
-    for c in rng.choice(len(pool), size=min(n_placebo * 2, len(pool)), replace=False):
+    for c in rng.choice(cand, size=min(n_placebo * 2, len(cand)), replace=False):
         if len(effects) >= n_placebo:
             break
-        d = haversine_miles(lat[c], lon[c], lat, lon)
-        cluster = [pool[i] for i in np.argsort(d)[: result.n_treated]]
-        # never let the real treated area (or its surroundings) donate to a placebo
-        nearby = [pool[i] for i in np.where(d < exclusion_mi)[0]] + list(exclude_zips)
+        d_all = haversine_miles(lat[c], lon[c], lat, lon)
+        d_pool = d_all[cand]
+        cluster = [allowed[cand[i]] for i in np.argsort(d_pool)[:n_treated]]
+        # never let the real treated area, or anything near the placebo, donate to it
+        nearby = [allowed[i] for i in np.where(d_all < exclusion_mi)[0]] + list(exclude_zips)
         try:
-            r = synthetic_control(wide, cluster, event_date, pre_months, post_months, nearby)
+            effects.append(synthetic_control(wide, cluster, event_date, pre_months, post_months,
+                                             nearby).effect_pct)
         except ValueError:
             continue
-        if fit_tolerance is None or r.pre_rmspe <= fit_tolerance * max(result.pre_rmspe, 1e-6):
-            effects.append(r.effect_pct)
+    return effects
 
-    arr = np.abs(np.array(effects))
-    result.n_placebos = len(effects)
-    result.p_value = float((1 + (arr >= abs(result.effect_pct)).sum()) / (1 + len(effects)))
+
+def p_value(effect: float, placebos: list[float]) -> float:
+    """Two-sided placebo p = (1 + #{|placebo| >= |effect|}) / (1 + n)."""
+    arr = np.abs(np.array(placebos))
+    return float((1 + (arr >= abs(effect)).sum()) / (1 + len(placebos)))
+
+
+def placebo_test(wide: pd.DataFrame, zctas: pd.DataFrame, result: SCResult, event_date,
+                 exclude_zips=(), pre_months: int = DEFAULT_PRE_MONTHS, post_months: int = 36,
+                 n_placebo: int = 40, seed: int = 0, exclusion_mi: float = 15.0,
+                 dense_pool=None) -> SCResult:
+    """Attach placebo p-values: how often a venue-less cluster shows an effect this large.
+
+    `p_value` uses clusters from anywhere. If `dense_pool` (ZIPs similar in land area to the
+    treated area) is given, `p_value_dense` repeats the test using only those, which asks whether
+    an effect this size is unusual among comparable urban areas in the same years, a direct check
+    on the 2020-22 urban/suburban divergence.
+
+    (An optional placebo pre-fit filter was removed: in simulation it made p-values
+    anti-conservative, 24% false positives at a nominal 10% vs. 4% without it, because a very tight
+    real fit discards legitimate placebos.)
+    """
+    kw = {"exclude_zips": exclude_zips, "pre_months": pre_months, "post_months": post_months,
+          "n_placebo": n_placebo, "seed": seed, "exclusion_mi": exclusion_mi}
+    result.placebo_effects = placebo_effects(wide, zctas, result.n_treated, event_date, **kw)
+    result.n_placebos = len(result.placebo_effects)
+    result.p_value = p_value(result.effect_pct, result.placebo_effects)
+    if dense_pool is not None:
+        result.placebo_effects_dense = placebo_effects(wide, zctas, result.n_treated, event_date,
+                                                       pool_zips=dense_pool, **kw)
+        if len(result.placebo_effects_dense) >= 10:
+            result.p_value_dense = p_value(result.effect_pct, result.placebo_effects_dense)
     return result
