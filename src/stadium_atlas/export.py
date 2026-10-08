@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
+import os
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -193,11 +195,22 @@ def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo
         venues = venues[venues["venue_id"] == only]
     _STATE.update(zctas=zctas, wide=prepare_wide(zhvi))   # inherited by forked workers
     jobs = [(v, n_placebo) for _, v in venues.iterrows()]
+    # One math thread per worker: several workers each spawning BLAS threads oversubscribe the
+    # cores and run many times slower than the same work single-threaded.
+    for var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ[var] = "1"
+    t0, results = time.time(), [None] * len(jobs)
     if workers > 1 and len(jobs) > 1:
         with ProcessPoolExecutor(workers, mp_context=mp.get_context("fork")) as ex:
-            results = list(ex.map(_process_venue, jobs))
+            futures = {ex.submit(_process_venue, j): i for i, j in enumerate(jobs)}
+            for n, fut in enumerate(as_completed(futures), start=1):
+                results[futures[fut]] = fut.result()
+                e = results[futures[fut]]["entry"]
+                print(f"[{n}/{len(jobs)}] {e['id']}: {e['verdict']} ({time.time() - t0:.0f}s)", flush=True)
     else:
-        results = [_process_venue(j) for j in jobs]
+        for i, j in enumerate(jobs):
+            results[i] = _process_venue(j)
+            print(f"[{i + 1}/{len(jobs)}] {results[i]['entry']['id']} ({time.time() - t0:.0f}s)", flush=True)
     entries, placebos = [], {}
     for r in results:
         e = r["entry"]
@@ -206,7 +219,6 @@ def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo
         if r["series"] is not None:
             (out_dir / "venues" / f"{e['id']}.json").write_text(
                 json.dumps(r["series"], separators=(",", ":")))
-        print(f"exported {e['id']}: {e['verdict']}", flush=True)
     (out_dir / "venues.json").write_text(json.dumps(entries, separators=(",", ":")))
     (out_dir / "pooled.json").write_text(json.dumps(pooled_summary(entries, placebos),
                                                     separators=(",", ":")))
