@@ -23,12 +23,19 @@ def main(argv=None) -> int:
     sy = sub.add_parser("synth", help="synthetic-control estimate + placebo p-value")
     sy.add_argument("--venue", help="venue_id (default: all)")
     sy.add_argument("--placebos", type=int, default=40)
+    sv = sub.add_parser("serve", help="serve the web app with the /api/ask question endpoint")
+    sv.add_argument("--port", type=int, default=8000)
     ex = sub.add_parser("export", help="write static JSON for the web app")
     ex.add_argument("--out", default="web/public/data")
     ex.add_argument("--placebos", type=int, default=40)
     ex.add_argument("--venue", help="export a single venue_id (default: all)")
     args = p.parse_args(argv)
 
+    if args.cmd == "serve":
+        from .server import serve
+
+        serve(port=args.port)
+        return 0
     if args.cmd == "fetch":
         for path in ingest.fetch_all():
             print(f"ok {path}")

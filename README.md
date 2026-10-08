@@ -38,8 +38,17 @@ atlas export --out web/public/data   # JSON for the web app (about 20 min)
 cd web && npm install && npm run dev
 ```
 
+### Ask the data (Claude-powered)
+`atlas serve` serves the built app (`cd web && npm run build` first) plus `POST /api/ask`. Questions are
+answered by `claude-opus-5-5` from a compact table of the exported results only (structured output,
+low effort), told to respect each venue's verdict and caveats and never to claim causation. It needs
+credentials (`ANTHROPIC_API_KEY` or `ant auth login`); without them the box says so. Server-side
+refusal fallback (`fallbacks: "default"`) is enabled, requests are length-limited, and the endpoint is
+rate-limited to 10 questions/minute per client. A static host (e.g. GitHub Pages) shows the app but not
+the question box.
+
 ## Roadmap
 1. ~~Pipeline, DiD, synthetic control, placebo inference, verification, 3D web app~~
 2. Pandemic-robust comparison for 2019-20 venues (urban-core donors from census density)
-3. Natural-language query layer (Claude API over the exported results)
+3. ~~Natural-language query layer~~ (built; not yet exercised against the live API)
 4. More leagues, NBA/NHL venues, team success overlays (championships)

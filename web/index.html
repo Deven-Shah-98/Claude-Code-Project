@@ -19,6 +19,14 @@
           <button data-sort="year">By year</button>
         </div>
       </header>
+      <form id="ask" autocomplete="off">
+        <label for="ask-q" class="eyebrow">Ask the data</label>
+        <div class="ask-row">
+          <input id="ask-q" maxlength="500" placeholder="Which venue had the biggest effect?" />
+          <button type="submit" id="ask-go">Ask</button>
+        </div>
+        <div id="ask-out" aria-live="polite"></div>
+      </form>
       <ul id="venue-list"></ul>
       <footer><button id="about-btn" class="link">How this works &amp; its limits</button></footer>
     </aside>

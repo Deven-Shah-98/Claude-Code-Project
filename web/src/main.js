@@ -219,6 +219,24 @@ async function select(id) {
   } catch { $('#time-label').textContent = 'No ZIP-level data for this venue'; }
 }
 
+// ---------- ask the data (needs `atlas serve`; static hosts show a friendly note) ----------
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function onAsk(e) {
+  e.preventDefault();
+  const q = $('#ask-q').value.trim(), out = $('#ask-out'), btn = $('#ask-go');
+  if (!q) return;
+  btn.disabled = true; out.textContent = 'Thinking…';
+  try {
+    const res = await fetch('api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || (res.status === 404 || res.status === 405 ? 'The question box needs the Python server: run `atlas serve`.' : `Error ${res.status}`));
+    const chips = (body.venue_ids || []).map((id) => state.venues.find((v) => v.id === id)).filter(Boolean)
+      .map((v) => `<button type="button" data-id="${v.id}">${esc(v.name)}</button>`).join('');
+    out.innerHTML = `<div>${esc(body.answer)}</div>${chips ? `<div class="chips">${chips}</div>` : ''}`;
+  } catch (err) { out.innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  finally { btn.disabled = false; }
+}
+
 // ---------- boot ----------
 async function boot() {
   state.venues = await (await fetch('data/venues.json')).json();
@@ -228,6 +246,8 @@ async function boot() {
     state.sort = b.dataset.sort; document.querySelectorAll('.sort button').forEach((x) => x.classList.toggle('on', x === b)); renderList(); }));
   $('#scrub').addEventListener('input', (e) => setT(Number(e.target.value), true));
   $('#play').addEventListener('click', () => (state.playing ? pause() : play()));
+  $('#ask').addEventListener('submit', onAsk);
+  $('#ask-out').addEventListener('click', (e) => { const b = e.target.closest('button[data-id]'); if (b) select(b.dataset.id); });
   $('#about-btn').addEventListener('click', () => $('#about').showModal());
   const first = state.venues.find((v) => v.verdict === 'signal') || state.venues.find((v) => v.sc);
   const wanted = new URLSearchParams(location.search).get('venue');
