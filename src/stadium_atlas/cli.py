@@ -20,6 +20,9 @@ def main(argv=None) -> int:
     sub.add_parser("fetch", help="download raw public datasets into data/raw")
     sc = sub.add_parser("score", help="stadium effect estimate for one or all venues")
     sc.add_argument("--venue", help="venue_id from data/seed/venues.csv (default: all)")
+    sy = sub.add_parser("synth", help="synthetic-control estimate + placebo p-value")
+    sy.add_argument("--venue", help="venue_id (default: all)")
+    sy.add_argument("--placebos", type=int, default=40)
     args = p.parse_args(argv)
 
     if args.cmd == "fetch":
@@ -29,6 +32,8 @@ def main(argv=None) -> int:
 
     zhvi, zctas = _load()
     venues = pipeline.load_venues()
+    if args.cmd == "synth":
+        return _synth(args, zhvi, zctas, venues)
     if args.venue:
         venues = venues[venues["venue_id"] == args.venue]
     rows = []
@@ -39,6 +44,32 @@ def main(argv=None) -> int:
         except ValueError as e:
             rows.append({"venue_id": v["venue_id"], "error": str(e)})
     print(json.dumps(rows, indent=2) if args.venue else pd.DataFrame(rows).to_string(index=False))
+    return 0
+
+
+def _synth(args, zhvi, zctas, venues) -> int:
+    from pathlib import Path
+
+    from .synthetic import prepare_wide
+
+    wide = prepare_wide(zhvi)
+    if args.venue:
+        venues = venues[venues["venue_id"] == args.venue]
+    out_dir = Path("data/processed")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows, gaps = [], {}
+    for _, v in venues.iterrows():
+        try:
+            res, meta = pipeline.venue_synthetic(v, zctas, wide, n_placebo=args.placebos)
+        except ValueError as e:
+            rows.append({"venue_id": v["venue_id"], "error": str(e)})
+            continue
+        rows.append({"venue_id": v["venue_id"], **res.as_dict(), **meta})
+        gaps[v["venue_id"]] = {int(k): float(x) for k, x in res.gap.items()}
+    table = pd.DataFrame(rows)
+    table.to_csv(out_dir / "synthetic_results.csv", index=False)
+    (out_dir / "synthetic_gaps.json").write_text(json.dumps(gaps))
+    print(table.round(3).to_string(index=False))
     return 0
 
 

@@ -6,7 +6,10 @@ from pathlib import Path
 import pandas as pd
 
 from .analysis import EffectEstimate, did_effect, event_study
-from .geo import DEFAULT_RINGS, assign_rings
+from .geo import DEFAULT_RINGS, assign_rings, haversine_miles
+from .synthetic import DEFAULT_PRE_MONTHS as SC_PRE
+from .synthetic import MIN_PRE_MONTHS as SC_MIN_PRE
+from .synthetic import SCResult, placebo_test, synthetic_control
 
 DEFAULT_PRE_MONTHS = 36
 MIN_PRE_MONTHS = 24
@@ -35,3 +38,29 @@ def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
         raise ValueError(f"insufficient pre-period: only {available} months of history "
                          f"before opening (need {MIN_PRE_MONTHS})")
     return did_effect(panel, event_date, pre_months=pre, **kwargs), event_study(panel, event_date)
+
+
+def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
+                    opening_month: int = 4, treated_radius_mi: float = 3.0,
+                    exclusion_mi: float = 15.0, n_placebo: int = 40,
+                    post_months: int = 36) -> tuple[SCResult, dict]:
+    """Synthetic-control estimate with placebo p-value for one venue.
+
+    Treated = ZIPs within `treated_radius_mi`; everything within `exclusion_mi` is barred from
+    the donor pool. Returns (result, meta) where meta records the pre-period actually used.
+    """
+    event_date = pd.Timestamp(year=int(venue["opened_year"]), month=opening_month, day=1)
+    first = wide.index.min()
+    available = (event_date.year - first.year) * 12 + (event_date.month - first.month)
+    pre = min(SC_PRE, available)
+    if pre < SC_MIN_PRE:
+        raise ValueError(f"insufficient pre-period: only {available} months of history "
+                         f"before opening (need {SC_MIN_PRE})")
+    d = haversine_miles(venue["lat"], venue["lon"], zctas["lat"].to_numpy(), zctas["lon"].to_numpy())
+    treated = list(zctas.loc[d < treated_radius_mi, "zip"])
+    excluded = list(zctas.loc[d < exclusion_mi, "zip"])
+    res = synthetic_control(wide, treated, event_date, pre_months=pre, post_months=post_months,
+                            exclude_zips=excluded)
+    res = placebo_test(wide, zctas, res, event_date, exclude_zips=excluded, pre_months=pre,
+                       post_months=post_months, n_placebo=n_placebo, exclusion_mi=exclusion_mi)
+    return res, {"pre_months": pre, "low_confidence": pre < SC_PRE}

@@ -108,12 +108,16 @@ def synthetic_control(wide: pd.DataFrame, treated_zips, event_date, pre_months: 
 def placebo_test(wide: pd.DataFrame, zctas: pd.DataFrame, result: SCResult, event_date,
                  exclude_zips=(), pre_months: int = DEFAULT_PRE_MONTHS, post_months: int = 36,
                  n_placebo: int = 40, seed: int = 0, exclusion_mi: float = 15.0,
-                 fit_tolerance: float = 2.0) -> SCResult:
+                 fit_tolerance: float | None = None) -> SCResult:
     """Attach a placebo p-value: how often a venue-less cluster shows an effect this large.
 
-    Placebo clusters are the `n_treated` nearest ZIPs to a random center. Placebos whose pre-fit
-    is more than `fit_tolerance` x the real unit's pre-fit are dropped (their counterfactual is
-    not comparable). Two-sided p = (1 + #{|placebo| >= |effect|}) / (1 + n_used).
+    Placebo clusters are the `n_treated` nearest ZIPs to a random center. Two-sided
+    p = (1 + #{|placebo| >= |effect|}) / (1 + n_used).
+
+    `fit_tolerance` optionally drops placebos whose pre-fit exceeds that multiple of the real
+    unit's. It is off by default: in simulation it made p-values anti-conservative (24% false
+    positives at a nominal 10%, vs. 4% without it) because a very tight real fit discards
+    legitimate placebos.
     """
     _, _, complete = _window(wide, event_date, pre_months, post_months)
     pool = [z for z in complete if z not in set(exclude_zips)]
@@ -134,7 +138,7 @@ def placebo_test(wide: pd.DataFrame, zctas: pd.DataFrame, result: SCResult, even
             r = synthetic_control(wide, cluster, event_date, pre_months, post_months, nearby)
         except ValueError:
             continue
-        if r.pre_rmspe <= fit_tolerance * max(result.pre_rmspe, 1e-6):
+        if fit_tolerance is None or r.pre_rmspe <= fit_tolerance * max(result.pre_rmspe, 1e-6):
             effects.append(r.effect_pct)
 
     arr = np.abs(np.array(effects))
