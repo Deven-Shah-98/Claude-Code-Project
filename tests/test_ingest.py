@@ -22,3 +22,9 @@ def test_parse_gazetteer_strips_column_whitespace():
     df = parse_zcta_gazetteer(io.StringIO(GAZ))
     assert list(df.columns) == ["zip", "lat", "lon"]
     assert df.loc[0, "zip"] == "02108"
+
+
+def test_parse_wikidata_point_is_lat_lon():
+    from stadium_atlas.verify import parse_point
+
+    assert parse_point("Point(-122.389444 37.778333)") == (37.778333, -122.389444)

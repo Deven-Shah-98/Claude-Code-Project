@@ -3,7 +3,7 @@ name = "stadium-atlas"
 version = "0.1.0"
 description = "How pro sports venues and team success relate to nearby housing markets, built on public data."
 requires-python = ">=3.11"
-dependencies = ["pandas>=2.2", "numpy>=1.26", "duckdb>=1.0", "requests>=2.31"]
+dependencies = ["pandas>=2.2", "numpy>=1.26", "duckdb>=1.0", "requests>=2.31", "scipy>=1.11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
