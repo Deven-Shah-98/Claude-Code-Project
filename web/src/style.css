@@ -17,7 +17,8 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--surface-0); color: var(--text-primary); }
 button { font: inherit; color: inherit; cursor: pointer; }
-#app { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+#app { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 100%; }
+#sidebar, #stage, .mini, .filters { min-width: 0; }
 
 /* sidebar */
 #sidebar { background: var(--surface-1); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
@@ -125,13 +126,15 @@ dialog b { color: var(--text-primary); }
 .close { position: absolute; right: 14px; top: 12px; background: none; border: 0; font-size: 16px; color: var(--text-secondary); }
 
 @media (max-width: 900px) {
-  #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  #sidebar { border-right: 0; border-bottom: 1px solid var(--line); max-height: 36vh; }
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #sidebar { border-right: 0; border-bottom: 1px solid var(--line); max-height: 34vh; overflow-y: auto; }
+  #venue-list { overflow: visible; flex: none; }
   #sidebar header { padding: 12px 16px 6px; }
   .sub { display: none; }
   #card { left: 12px; right: 12px; top: auto; bottom: 100px; width: auto; max-height: 34%; }
   #timeline { bottom: 14px; padding-right: 12px; }
-  #legend, #map-hint { display: none; }
+  #legend, #map-hint, .maplibregl-ctrl-bottom-right { display: none; }
+  #open-tick span { display: none; }
   #time-label { min-width: 0; font-size: 12px; }
 }
 
@@ -149,3 +152,5 @@ dialog b { color: var(--text-primary); }
 .frow { cursor: pointer; } .frow:hover rect, .frow:focus rect { fill: rgba(255,255,255,.05); } .frow:focus { outline: none; }
 .tbl { margin-top: 4px; }
 [hidden] { display: none !important; }
+#suggested { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+#suggested button { flex: none; white-space: nowrap; }

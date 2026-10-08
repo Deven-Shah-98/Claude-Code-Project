@@ -54,7 +54,7 @@ export function render() {
       getLineWidth: (d) => (d.verdict === 'signal' ? 3 : 1.5), lineWidthUnits: 'pixels',
       onClick: ({ object }) => object && handlers.select?.(object.id), onHover }));
   } else {
-    const t = state.t, zoomed = map.getZoom() >= LABEL_ZOOM;
+    const t = state.t, zoom = map.getZoom(), zoomed = zoom >= LABEL_ZOOM, labelMi = zoom < 11 ? 3 : zoom < 12 ? 6 : 15;
     layers.push(new ScatterplotLayer({ id: 'rings', data: RINGS.map((r) => ({ r })), getPosition: () => [v.lon, v.lat], getRadius: (x) => x.r * MILE,
       radiusUnits: 'meters', stroked: true, filled: false, getLineColor: [255, 255, 255, 45], lineWidthMinPixels: 1 }));
     layers.push(new TextLayer({ id: 'ring-labels', data: ringLabels(v), getPosition: (d) => d.pos, getText: (d) => d.text, getSize: 11,
@@ -66,10 +66,10 @@ export function render() {
         material: { ambient: 0.55, diffuse: 0.65, shininess: 20 },
         transitions: { getElevation: 220, getFillColor: 220 }, updateTriggers: { getElevation: [t], getFillColor: [t, state.focusZip] }, onHover }));
       if (zoomed) {
-        const labelled = Object.values(state.zipIndex).filter((z) => z.dist <= 6 || z.zip === state.focusZip);
+        const labelled = Object.values(state.zipIndex).filter((z) => z.dist <= labelMi || z.zip === state.focusZip);
         layers.push(new TextLayer({ id: 'zip-labels', data: labelled, getPosition: (z) => [z.lon, z.lat, z.value_k[t] * HEIGHT_M_PER_K + 40],
-          getText: (z) => z.zip, getSize: 11, getColor: [235, 235, 225, 235], outlineWidth: 3, outlineColor: [15, 15, 14, 255],
-          fontSettings: { sdf: true }, parameters: { depthTest: false }, updateTriggers: { getPosition: [t] } }));
+          getText: (z) => z.zip, getSize: zoom < 11 ? 10 : 11, getColor: [235, 235, 225, 235], outlineWidth: 3, outlineColor: [15, 15, 14, 255],
+          fontSettings: { sdf: true }, parameters: { depthTest: false }, updateTriggers: { getPosition: [t], getSize: [zoom] } }));
       }
     }
     layers.push(new ScatterplotLayer({ id: 'venue-glow', data: [v], getPosition: (x) => [x.lon, x.lat], getRadius: 14, radiusUnits: 'pixels', getFillColor: [255, 255, 255, 255], stroked: true, getLineColor: [57, 135, 229, 255], lineWidthMinPixels: 3, parameters: { depthTest: false } }));
@@ -86,6 +86,6 @@ export function flyToVenue(v) {
 
 export function flyToOverview() {
   const wide = window.innerWidth > 900;
-  map.flyTo({ center: [-96, 38.5], zoom: wide ? 3.5 : 2.6, pitch: 0, bearing: 0, duration: 1500, essential: true,
-    padding: wide ? { right: 440, bottom: 0, top: 0, left: 0 } : { bottom: 300, top: 0, left: 0, right: 0 } });
+  map.flyTo({ center: [-96, 38.5], zoom: wide ? 3.3 : 2.6, pitch: 0, bearing: 0, duration: 1500, essential: true,
+    padding: wide ? { right: 480, bottom: 0, top: 0, left: 0 } : { bottom: 300, top: 0, left: 0, right: 0 } });
 }

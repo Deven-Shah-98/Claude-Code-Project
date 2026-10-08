@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     gx.add_argument("--out", default="web/public/data")
     tt = sub.add_parser("titles", help="World Series winners (MLB API) for the title markers")
     tt.add_argument("--out", default="web/public/data")
+    po = sub.add_parser("pool", help="recompute pooled.json from saved venues and placebos")
+    po.add_argument("--out", default="web/public/data")
     ex = sub.add_parser("export", help="write static JSON for the web app")
     ex.add_argument("--out", default="web/public/data")
     ex.add_argument("--placebos", type=int, default=40)
@@ -36,6 +38,12 @@ def main(argv=None) -> int:
     ex.add_argument("--workers", type=int, default=4, help="parallel venues")
     args = p.parse_args(argv)
 
+    if args.cmd == "pool":
+        from .export import repool
+
+        res = repool(args.out)
+        print(json.dumps({k: res[k] for k in ("all", "by_league", "by_era")}, indent=1))
+        return 0
     if args.cmd == "titles":
         from .titles import export_titles
 

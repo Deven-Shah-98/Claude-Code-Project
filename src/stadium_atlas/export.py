@@ -165,11 +165,19 @@ def _process_venue(args: tuple) -> dict:
     return {"entry": entry, "series": series, "placebos": placebos}
 
 
+def era(year: int) -> str:
+    """Opening era. 2006-2009 venues have post-windows inside the 2008-11 housing bust."""
+    if year <= 2007:
+        return "2003-07"
+    return "2008-11" if year <= 2011 else "2012-18"
+
+
 def pooled_summary(entries: list[dict], placebos: dict[str, dict]) -> dict:
     """Pool scorable venues; pandemic-window venues are reported separately, never mixed in."""
     def rows(pred):
-        return [{**e["sc"], "id": e["id"], "league": e["league"], "effect_pct": e["sc"]["effect_pct"],
-                 **placebos[e["id"]]} for e in entries if "sc" in e and pred(e)]
+        return [{**e["sc"], "id": e["id"], "league": e["league"], "era": era(e["opened_year"]),
+                 "effect_pct": e["sc"]["effect_pct"], **placebos[e["id"]]}
+                for e in entries if "sc" in e and pred(e)]
 
     main = rows(lambda e: e["verdict"] != "confounded")
     pandemic = rows(lambda e: e["verdict"] == "confounded")
@@ -179,6 +187,7 @@ def pooled_summary(entries: list[dict], placebos: dict[str, dict]) -> dict:
         "all": pooled.pool(main),
         "dense_null": pooled.pool(main, "placebo_effects_dense"),
         "by_league": pooled.by_group(main, "league"),
+        "by_era": pooled.by_group(main, "era"),
         "pandemic_window": pooled.pool(pandemic) if len(pandemic) >= 3 else {"n": len(pandemic)},
         "forest": [{"id": e["id"], "name": e["name"], "league": e["league"], "year": e["opened_year"],
                     "effect_pct": e["sc"]["effect_pct"], "band_pct": e["band_pct"],
@@ -226,3 +235,13 @@ def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo
     proc.mkdir(parents=True, exist_ok=True)
     (proc / "placebos.json").write_text(json.dumps(placebos))
     return pd.DataFrame(entries)
+
+
+def repool(data_dir: str = "web/public/data") -> dict:
+    """Recompute pooled.json from the saved venues.json and placebo draws (no re-estimation)."""
+    data = Path(data_dir)
+    entries = json.loads((data / "venues.json").read_text())
+    placebos = json.loads(Path("data/processed/placebos.json").read_text())
+    out = pooled_summary(entries, placebos)
+    (data / "pooled.json").write_text(json.dumps(out, separators=(",", ":")))
+    return out

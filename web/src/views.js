@@ -70,25 +70,33 @@ function drawTable(v) {
 }
 
 // ---- pooled "big picture" ------------------------------------------------------------------------
+const groupRows = (g) => Object.entries(g || {}).map(([k, r]) => `<tr><td>${k}</td><td>${r.n}</td><td>${fmtPct(r.mean_pct)}</td><td>${fmtPct(r.ci_pct[0], 0)} to ${fmtPct(r.ci_pct[1], 0)}</td></tr>`).join('');
+const excludesZero = (ci) => ci[0] > 0 || ci[1] < 0;
+
 export function renderPooled(onPick) {
   const P = state.pooled, c = $('#card');
   if (!P || !P.all || P.all.error) { c.innerHTML = `<div class="eyebrow">Big picture</div><p class="pval">Pooled results are not available in this data export.</p>`; return; }
-  const a = P.all, d = P.dense_null, includesZero = a.ci_pct[0] <= 0 && a.ci_pct[1] >= 0;
-  const headline = includesZero ? 'No clear average effect' : a.mean_pct > 0 ? 'Faster growth near new venues, on average' : 'Slower growth near new venues, on average';
+  const a = P.all, d = P.dense_null, dir = a.mean_pct > 0 ? 'faster' : 'slower';
+  const headline = excludesZero(a.ci_pct) ? `${dir[0].toUpperCase()}${dir.slice(1)} growth near new venues, on average`
+    : (excludesZero(a.random_effects_ci_pct) || a.placebo_p < 0.05) ? `Modestly ${dir} growth on average, not conclusive` : 'No clear average effect';
   const rows = [...P.forest].sort((x, y) => y.effect_pct - x.effect_pct).filter((r) => state.league === 'all' || r.league === state.league);
-  const leagueRows = Object.entries(P.by_league || {}).map(([l, r]) => `<tr><td>${l}</td><td>${r.n}</td><td>${fmtPct(r.mean_pct)}</td><td>${fmtPct(r.ci_pct[0], 0)} to ${fmtPct(r.ci_pct[1], 0)}</td></tr>`).join('');
   const pw = P.pandemic_window, yrs = P.forest.filter((r) => r.verdict !== 'confounded').map((r) => r.year).sort();
+  const eras = Object.entries(P.by_era || {}).filter(([, r]) => excludesZero(r.ci_pct));
+  const eraNote = eras.length ? `Clearest in the ${eras.map(([k, r]) => `${k} venues (${fmtPct(r.mean_pct)}, 95% CI ${fmtPct(r.ci_pct[0], 0)} to ${fmtPct(r.ci_pct[1], 0)})`).join(' and ')}.` : '';
   c.innerHTML = `
     <div class="eyebrow">Big picture · ${a.n} venues opened ${yrs[0]}–${yrs.at(-1)}</div>
     <h2>${headline}</h2>
     <div class="hero"><span class="num">${fmtPct(a.mean_pct)}</span><span class="cap">average effect vs. synthetic twins<br>95% CI ${fmtPct(a.ci_pct[0])} to ${fmtPct(a.ci_pct[1])}</span></div>
-    <p class="pval">${includesZero ? 'The interval includes zero, so the data do not show that a new venue changes nearby home-value growth on average.' : 'The interval excludes zero.'}
-      ${Math.round(a.share_positive * a.n)} of ${a.n} venues are positive (sign test p = ${a.sign_test_p.toFixed(2)}).
-      Pooled placebo p = <b>${a.placebo_p.toFixed(3)}</b>${d && !d.error ? ` (<b>${d.placebo_p.toFixed(3)}</b> using only similarly sized ZIPs as the null)` : ''}.</p>
-    <p class="pval faint">Association, not proof of causation. Placebo p-values are approximate (slightly liberal in simulation); the interval is a t-interval over venues. Random-effects estimate ${fmtPct(a.random_effects_pct)} (heterogeneity I² = ${(a.i2 * 100).toFixed(0)}%).</p>
+    <p class="pval">Three ways of testing agree on the direction but not on certainty: the interval across venues ${excludesZero(a.ci_pct) ? 'excludes' : 'just includes'} zero;
+      a random-effects model gives ${fmtPct(a.random_effects_pct)} (${fmtPct(a.random_effects_ci_pct[0])} to ${fmtPct(a.random_effects_ci_pct[1])});
+      the pooled placebo test gives p = <b>${a.placebo_p.toFixed(3)}</b>${d && !d.error ? ` (<b>${d.placebo_p.toFixed(3)}</b> against similarly sized ZIPs)` : ''}.
+      Venues differ a lot (I² = ${(a.i2 * 100).toFixed(0)}%): ${Math.round(a.share_positive * a.n)} of ${a.n} are positive (sign test p = ${a.sign_test_p.toFixed(2)}), and only a few stand out on their own. ${eraNote}</p>
+    <p class="pval faint">Association, not proof of causation: venues are usually built as part of larger redevelopment, which this method cannot separate from the venue itself. Placebo p-values are approximate (slightly liberal in simulation); the interval is a t-interval over venues.</p>
     <h3>Every venue</h3>
     <div class="chart" id="forest"></div>
-    ${leagueRows ? `<h3>By league</h3><table class="tbl"><tr><th>League</th><th>Venues</th><th>Mean</th><th>95% CI</th></tr>${leagueRows}</table>` : ''}
+    ${P.by_era ? `<h3>By opening era <span class="faint">(exploratory)</span></h3><table class="tbl"><tr><th>Opened</th><th>Venues</th><th>Mean</th><th>95% CI</th></tr>${groupRows(P.by_era)}</table>
+      <p class="pval faint">Venues opened 2006–09 had post-opening windows inside the 2008–11 housing bust, which hit metros unevenly.</p>` : ''}
+    ${P.by_league ? `<h3>By league <span class="faint">(exploratory)</span></h3><table class="tbl"><tr><th>League</th><th>Venues</th><th>Mean</th><th>95% CI</th></tr>${groupRows(P.by_league)}</table>` : ''}
     ${pw && pw.n ? `<h3>Opened 2019–20</h3><p class="pval">${pw.n} venues overlap the pandemic window${pw.mean_pct != null ? `; their average is ${fmtPct(pw.mean_pct)}` : ''}. They are kept out of the pooled estimate above.</p>` : ''}`;
   drawForest($('#forest'), rows, onPick);
 }
