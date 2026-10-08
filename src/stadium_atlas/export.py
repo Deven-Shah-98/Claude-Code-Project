@@ -57,9 +57,9 @@ def _quarter_idx(wide: pd.DataFrame, start: pd.Period, end: pd.Period) -> list[p
 
 
 def zip_series(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
-               opening_month: int = 4, years_before: int = 5, years_after: int = 3) -> dict:
+               month: int | None = None, years_before: int = 5, years_after: int = 3) -> dict:
     """Quarterly ZIP panel within MAP_RADIUS_MI: value ($k) and % change vs pre-opening level."""
-    opened = pd.Period(year=int(venue["opened_year"]), month=opening_month, freq="M")
+    opened = pd.Period(year=int(venue["opened_year"]), month=month or pipeline.opening_month(venue), freq="M")
     qs = _quarter_idx(wide, opened - 12 * years_before, opened + 12 * years_after)
     d = haversine_miles(venue["lat"], venue["lon"], zctas["lat"].to_numpy(), zctas["lon"].to_numpy())
     near = zctas.assign(dist=d)[d < MAP_RADIUS_MI]

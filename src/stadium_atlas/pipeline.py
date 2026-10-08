@@ -16,6 +16,17 @@ MIN_PRE_MONTHS = 24
 SEED_VENUES = Path(__file__).resolve().parents[2] / "data" / "seed" / "venues.csv"
 
 
+# Typical season-opening month, used only when Wikidata has a year but no precise date.
+DEFAULT_OPENING_MONTH = {"MLB": 4, "NFL": 9, "NBA": 10, "NHL": 10}
+
+
+def opening_month(venue: pd.Series) -> int:
+    m = venue.get("opened_month")
+    if m is not None and not pd.isna(m):
+        return int(m)
+    return DEFAULT_OPENING_MONTH.get(venue.get("league"), 4)
+
+
 def load_venues(path: Path = SEED_VENUES) -> pd.DataFrame:
     return pd.read_csv(path)
 
@@ -28,9 +39,10 @@ def venue_panel(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
 
 
 def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
-                 opening_month: int = 4, **kwargs) -> tuple[EffectEstimate, pd.DataFrame]:
+                 month: int | None = None, **kwargs) -> tuple[EffectEstimate, pd.DataFrame]:
     panel = venue_panel(venue, zctas, zhvi)
-    event_date = pd.Timestamp(year=int(venue["opened_year"]), month=opening_month, day=1)
+    event_date = pd.Timestamp(year=int(venue["opened_year"]),
+                              month=month or opening_month(venue), day=1)
     first = zhvi["date"].min()
     available = (event_date.year - first.year) * 12 + (event_date.month - first.month)
     pre = min(kwargs.pop("pre_months", DEFAULT_PRE_MONTHS), available)
@@ -41,7 +53,7 @@ def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
 
 
 def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
-                    opening_month: int = 4, treated_radius_mi: float = 3.0,
+                    month: int | None = None, treated_radius_mi: float = 3.0,
                     exclusion_mi: float = 15.0, n_placebo: int = 40,
                     post_months: int = 36, density_match: float | None = None) -> tuple[SCResult, dict]:
     """Synthetic-control estimate with placebo p-value for one venue.
@@ -49,7 +61,8 @@ def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
     Treated = ZIPs within `treated_radius_mi`; everything within `exclusion_mi` is barred from
     the donor pool. Returns (result, meta) where meta records the pre-period actually used.
     """
-    event_date = pd.Timestamp(year=int(venue["opened_year"]), month=opening_month, day=1)
+    event_date = pd.Timestamp(year=int(venue["opened_year"]),
+                              month=month or opening_month(venue), day=1)
     first = wide.index.min()
     available = (event_date.year - first.year) * 12 + (event_date.month - first.month)
     pre = min(SC_PRE, available)
