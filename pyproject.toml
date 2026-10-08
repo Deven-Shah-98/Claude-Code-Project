@@ -1,0 +1,25 @@
+[project]
+name = "stadium-atlas"
+version = "0.1.0"
+description = "How pro sports venues and team success relate to nearby housing markets, built on public data."
+requires-python = ">=3.11"
+dependencies = ["pandas>=2.2", "numpy>=1.26", "duckdb>=1.0", "requests>=2.31"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+atlas = "stadium_atlas.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
