@@ -1,17 +1,38 @@
-venue_id,name,team,league,city,state,lat,lon,opened_year,coords_verified,wikidata_qid
-oracle-park,Oracle Park,San Francisco Giants,MLB,San Francisco,CA,37.7786,-122.3893,2000,True,Q298585
-pnc-park,PNC Park,Pittsburgh Pirates,MLB,Pittsburgh,PA,40.4469,-80.0057,2001,True,Q1151177
-lumen-field,Lumen Field,Seattle Seahawks,NFL,Seattle,WA,47.5952,-122.3316,2002,True,Q612736
-great-american,Great American Ball Park,Cincinnati Reds,MLB,Cincinnati,OH,39.0974,-84.5066,2003,True,Q979975
-petco-park,Petco Park,San Diego Padres,MLB,San Diego,CA,32.7073,-117.1566,2004,True,Q1194586
-citizens-bank,Citizens Bank Park,Philadelphia Phillies,MLB,Philadelphia,PA,39.9061,-75.1665,2004,True,Q912770
-nationals-park,Nationals Park,Washington Nationals,MLB,Washington,DC,38.873,-77.0074,2008,True,Q517545
-lucas-oil,Lucas Oil Stadium,Indianapolis Colts,NFL,Indianapolis,IN,39.7601,-86.1639,2008,True,Q867160
-target-field,Target Field,Minnesota Twins,MLB,Minneapolis,MN,44.9817,-93.2776,2010,True,Q1156635
-barclays,Barclays Center,Brooklyn Nets,NBA,Brooklyn,NY,40.6826,-73.9754,2012,True,Q807966
-levis-stadium,Levi's Stadium,San Francisco 49ers,NFL,Santa Clara,CA,37.403,-121.97,2014,True,Q7419343
-truist-park,Truist Park,Atlanta Braves,MLB,Atlanta,GA,33.8908,-84.4678,2017,True,Q17003430
-chase-center,Chase Center,Golden State Warriors,NBA,San Francisco,CA,37.768,-122.3877,2019,True,Q15262098
-sofi-stadium,SoFi Stadium,Los Angeles Rams/Chargers,NFL,Inglewood,CA,33.9535,-118.3392,2020,True,Q19520501
-globe-life-field,Globe Life Field,Texas Rangers,MLB,Arlington,TX,32.7473,-97.0845,2020,True,Q24284037
-allegiant,Allegiant Stadium,Las Vegas Raiders,NFL,Las Vegas,NV,36.0909,-115.1833,2020,True,Q27768421
+venue_id,name,team,league,city,state,lat,lon,opened_year,coords_verified,wikidata_qid,opened_month
+oracle-park,Oracle Park,San Francisco Giants,MLB,San Francisco,CA,37.7786,-122.3893,2000,True,Q298585,4
+pnc-park,PNC Park,Pittsburgh Pirates,MLB,Pittsburgh,PA,40.4469,-80.0057,2001,True,Q1151177,
+lumen-field,Lumen Field,Seattle Seahawks,NFL,Seattle,WA,47.5952,-122.3316,2002,True,Q612736,7
+great-american,Great American Ball Park,Cincinnati Reds,MLB,Cincinnati,OH,39.0974,-84.5066,2003,True,Q979975,3
+petco-park,Petco Park,San Diego Padres,MLB,San Diego,CA,32.7073,-117.1566,2004,True,Q1194586,4
+citizens-bank,Citizens Bank Park,Philadelphia Phillies,MLB,Philadelphia,PA,39.9061,-75.1665,2004,True,Q912770,4
+nationals-park,Nationals Park,Washington Nationals,MLB,Washington,DC,38.873,-77.0074,2008,True,Q517545,3
+lucas-oil,Lucas Oil Stadium,Indianapolis Colts,NFL,Indianapolis,IN,39.7601,-86.1639,2008,True,Q867160,8
+target-field,Target Field,Minnesota Twins,MLB,Minneapolis,MN,44.9817,-93.2776,2010,True,Q1156635,4
+barclays,Barclays Center,Brooklyn Nets,NBA,Brooklyn,NY,40.6826,-73.9754,2012,True,Q807966,9
+levis-stadium,Levi's Stadium,San Francisco 49ers,NFL,Santa Clara,CA,37.403,-121.97,2014,True,Q7419343,7
+truist-park,Truist Park,Atlanta Braves,MLB,Atlanta,GA,33.8908,-84.4678,2017,True,Q17003430,4
+chase-center,Chase Center,Golden State Warriors,NBA,San Francisco,CA,37.768,-122.3877,2019,True,Q15262098,9
+sofi-stadium,SoFi Stadium,Los Angeles Rams/Chargers,NFL,Inglewood,CA,33.9535,-118.3392,2020,True,Q19520501,
+globe-life-field,Globe Life Field,Texas Rangers,MLB,Arlington,TX,32.7473,-97.0845,2020,True,Q24284037,
+allegiant,Allegiant Stadium,Las Vegas Raiders,NFL,Las Vegas,NV,36.0909,-115.1833,2020,True,Q27768421,7
+busch-stadium,Busch Stadium,St. Louis Cardinals,MLB,St. Louis,MO,38.6225,-90.19306,2006,True,Q253546,4
+citi-field,Citi Field,New York Mets,MLB,Queens,NY,40.75699,-73.84578,2009,True,Q1072882,3
+yankee-stadium,Yankee Stadium,New York Yankees,MLB,Bronx,NY,40.82957,-73.92639,2009,True,Q753529,
+loandepot-park,LoanDepot Park,Miami Marlins,MLB,Miami,FL,25.77806,-80.21972,2012,True,Q1368138,4
+lincoln-financial,Lincoln Financial Field,Philadelphia Eagles,NFL,Philadelphia,PA,39.90089,-75.16776,2003,True,Q1052370,8
+state-farm-stadium,State Farm Stadium,Arizona Cardinals,NFL,Glendale,AZ,33.5275,-112.2625,2006,True,Q756433,8
+att-stadium,AT&T Stadium,Dallas Cowboys,NFL,Arlington,TX,32.74769,-97.09288,2009,True,Q838284,5
+metlife-stadium,MetLife Stadium,New York Giants/Jets,NFL,East Rutherford,NJ,40.81361,-74.07444,2010,True,Q10862290,4
+us-bank-stadium,U.S. Bank Stadium,Minnesota Vikings,NFL,Minneapolis,MN,44.97389,-93.25806,2016,True,Q7929512,7
+mercedes-benz,Mercedes-Benz Stadium,Atlanta Falcons,NFL,Atlanta,GA,33.75528,-84.40083,2017,True,Q7007552,8
+toyota-center,Toyota Center,Houston Rockets,NBA,Houston,TX,29.75083,-95.36222,2003,True,Q1166157,10
+fedexforum,FedExForum,Memphis Grizzlies,NBA,Memphis,TN,35.13833,-90.05056,2004,True,Q641212,9
+spectrum-center,Spectrum Center,Charlotte Hornets,NBA,Charlotte,NC,35.225,-80.83917,2005,True,Q983870,10
+kia-center,Kia Center,Orlando Magic,NBA,Orlando,FL,28.53917,-81.38361,2010,True,Q481795,10
+golden-1-center,Golden 1 Center,Sacramento Kings,NBA,Sacramento,CA,38.58,-121.5,2016,True,Q7011384,9
+little-caesars,Little Caesars Arena,Detroit Pistons/Red Wings,NBA,Detroit,MI,42.3412,-83.0549,2017,True,Q18154984,9
+fiserv-forum,Fiserv Forum,Milwaukee Bucks,NBA,Milwaukee,WI,43.0451,-87.9182,2018,True,Q20372160,8
+gila-river-arena,Desert Diamond Arena,Arizona Coyotes,NHL,Glendale,AZ,33.53194,-112.26111,2003,True,Q1421377,12
+prudential-center,Prudential Center,New Jersey Devils,NHL,Newark,NJ,40.73361,-74.17111,2007,True,Q849027,
+ppg-paints,PPG Paints Arena,Pittsburgh Penguins,NHL,Pittsburgh,PA,40.4394,-79.9892,2010,True,Q595460,8
+t-mobile-arena,T-Mobile Arena,Vegas Golden Knights,NHL,Las Vegas,NV,36.10292,-115.17836,2016,True,Q3338973,4

@@ -25,12 +25,36 @@ def main(argv=None) -> int:
     sy.add_argument("--placebos", type=int, default=40)
     sv = sub.add_parser("serve", help="serve the web app with the /api/ask question endpoint")
     sv.add_argument("--port", type=int, default=8000)
+    gx = sub.add_parser("geo", help="write simplified ZIP/state boundaries for the web map")
+    gx.add_argument("--out", default="web/public/data")
+    tt = sub.add_parser("titles", help="World Series winners (MLB API) for the title markers")
+    tt.add_argument("--out", default="web/public/data")
+    po = sub.add_parser("pool", help="recompute pooled.json from saved venues and placebos")
+    po.add_argument("--out", default="web/public/data")
     ex = sub.add_parser("export", help="write static JSON for the web app")
     ex.add_argument("--out", default="web/public/data")
     ex.add_argument("--placebos", type=int, default=40)
     ex.add_argument("--venue", help="export a single venue_id (default: all)")
+    ex.add_argument("--workers", type=int, default=4, help="parallel venues")
     args = p.parse_args(argv)
 
+    if args.cmd == "pool":
+        from .export import repool
+
+        res = repool(args.out)
+        print(json.dumps({k: res[k] for k in ("all", "by_league", "by_era")}, indent=1))
+        return 0
+    if args.cmd == "titles":
+        from .titles import export_titles
+
+        res = export_titles(args.out)
+        print(res["seasons_found"], "seasons found;", {k: v for k, v in res["titles"].items() if v})
+        return 0
+    if args.cmd == "geo":
+        from .geoexport import export_geo
+
+        print(export_geo(args.out))
+        return 0
     if args.cmd == "serve":
         from .server import serve
 
@@ -46,7 +70,8 @@ def main(argv=None) -> int:
     if args.cmd == "export":
         from .export import export_all
 
-        export_all(zhvi, zctas, args.out, n_placebo=args.placebos, only=args.venue)
+        export_all(zhvi, zctas, args.out, n_placebo=args.placebos, only=args.venue,
+                   workers=args.workers)
         return 0
     if args.cmd == "synth":
         return _synth(args, zhvi, zctas, venues)
