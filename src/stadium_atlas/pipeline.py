@@ -43,7 +43,7 @@ def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
 def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
                     opening_month: int = 4, treated_radius_mi: float = 3.0,
                     exclusion_mi: float = 15.0, n_placebo: int = 40,
-                    post_months: int = 36, density_match: float | None = 3.0) -> tuple[SCResult, dict]:
+                    post_months: int = 36, density_match: float | None = None) -> tuple[SCResult, dict]:
     """Synthetic-control estimate with placebo p-value for one venue.
 
     Treated = ZIPs within `treated_radius_mi`; everything within `exclusion_mi` is barred from

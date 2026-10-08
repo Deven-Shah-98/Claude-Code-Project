@@ -14,6 +14,8 @@ from .synthetic import SCResult, prepare_wide
 PANDEMIC_START_YEAR = 2019   # post-windows for venues opening from here include 2020-22
 FEW_ZIPS = 5
 MAP_RADIUS_MI = 15.0
+ROBUST_DENSITY = 3.0       # donor land area cap (x treated median) for the robustness re-run
+ROBUST_MIN_DONORS = 200    # below this the robustness pool is too thin to judge anything
 
 
 def verdict(res: SCResult | None, meta: dict | None, opened_year: int) -> tuple[str, list[str]]:
@@ -36,6 +38,17 @@ def verdict(res: SCResult | None, meta: dict | None, opened_year: int) -> tuple[
     if res.p_value is not None and res.p_value <= 0.10:
         return "suggestive", caveats
     return "inconclusive", caveats
+
+
+def robustness_downgrade(primary: SCResult, alt: SCResult) -> str | None:
+    """Reason to distrust the primary estimate, or None if the alternative donor pool agrees."""
+    if alt.n_donors < ROBUST_MIN_DONORS:
+        return None
+    same_sign = np.sign(alt.effect_pct) == np.sign(primary.effect_pct)
+    if same_sign and alt.p_value is not None and alt.p_value <= 0.10:
+        return None
+    return (f"Sensitive to the comparison pool: with density-matched donors the estimate is "
+            f"{alt.effect_pct:+.1f}% (placebo p = {alt.p_value:.2f}).")
 
 
 def _quarter_idx(wide: pd.DataFrame, start: pd.Period, end: pd.Period) -> list[pd.Period]:
@@ -92,6 +105,16 @@ def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo
         except ValueError as e:
             err = str(e)
         label, caveats = verdict(res, meta, int(v["opened_year"]))
+        robust = None
+        if label in ("signal", "suggestive"):
+            alt, _ = pipeline.venue_synthetic(v, zctas, wide, n_placebo=n_placebo,
+                                              density_match=ROBUST_DENSITY)
+            robust = {"effect_pct": round(alt.effect_pct, 2), "p_value": round(alt.p_value, 4),
+                      "n_donors": alt.n_donors}
+            reason = robustness_downgrade(res, alt)
+            if reason:
+                caveats.append(reason)
+                label = "suggestive" if label == "signal" else "inconclusive"
         entry = {
             "id": v["venue_id"], "name": v["name"], "team": v["team"], "league": v["league"],
             "city": v["city"], "state": v["state"], "lat": float(v["lat"]),
@@ -102,6 +125,7 @@ def export_all(zhvi: pd.DataFrame, zctas: pd.DataFrame, out_dir: Path, n_placebo
             entry["sc"] = {**{k: (None if x is None else round(float(x), 4))
                               for k, x in res.as_dict().items()},
                            "pre_months": meta["pre_months"]}
+            entry["robustness"] = robust
             entry["chart"] = chart_series(res)
             entry["donors"] = [{"zip": z, "w": round(float(w), 3)}
                                for z, w in res.weights.head(5).items()]
