@@ -20,7 +20,7 @@ def test_parse_zhvi_long_format_pads_zip_and_drops_na():
 
 def test_parse_gazetteer_strips_column_whitespace():
     df = parse_zcta_gazetteer(io.StringIO(GAZ))
-    assert list(df.columns) == ["zip", "lat", "lon"]
+    assert list(df.columns) == ["zip", "lat", "lon", "land_sqmi"]
     assert df.loc[0, "zip"] == "02108"
 
 

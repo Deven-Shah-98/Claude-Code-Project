@@ -5,3 +5,4 @@ data/raw/
 data/processed/
 *.duckdb
 node_modules/
+web/dist/

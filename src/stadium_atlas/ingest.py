@@ -50,15 +50,16 @@ def parse_zhvi(source) -> pd.DataFrame:
 
 
 def parse_zcta_gazetteer(source) -> pd.DataFrame:
-    """Census gazetteer (tab-delimited, optionally zipped) -> zip, lat, lon."""
+    """Census gazetteer (tab-delimited, optionally zipped) -> zip, lat, lon, land_sqmi."""
     if isinstance(source, (str, Path)) and str(source).endswith(".zip"):
         with zipfile.ZipFile(source) as z:
             name = next(n for n in z.namelist() if n.endswith(".txt"))
             source = io.BytesIO(z.read(name))
     df = pd.read_csv(source, sep="\t", dtype={"GEOID": str})
     df.columns = [c.strip() for c in df.columns]
-    df = df.rename(columns={"GEOID": "zip", "INTPTLAT": "lat", "INTPTLONG": "lon"})
-    return df[["zip", "lat", "lon"]]
+    df = df.rename(columns={"GEOID": "zip", "INTPTLAT": "lat", "INTPTLONG": "lon",
+                            "ALAND_SQMI": "land_sqmi"})
+    return df[["zip", "lat", "lon", "land_sqmi"]]
 
 
 def fetch_all(force: bool = False) -> tuple[Path, Path]:

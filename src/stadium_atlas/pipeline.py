@@ -43,7 +43,7 @@ def venue_effect(venue: pd.Series, zctas: pd.DataFrame, zhvi: pd.DataFrame,
 def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
                     opening_month: int = 4, treated_radius_mi: float = 3.0,
                     exclusion_mi: float = 15.0, n_placebo: int = 40,
-                    post_months: int = 36) -> tuple[SCResult, dict]:
+                    post_months: int = 36, density_match: float | None = 3.0) -> tuple[SCResult, dict]:
     """Synthetic-control estimate with placebo p-value for one venue.
 
     Treated = ZIPs within `treated_radius_mi`; everything within `exclusion_mi` is barred from
@@ -59,8 +59,14 @@ def venue_synthetic(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
     d = haversine_miles(venue["lat"], venue["lon"], zctas["lat"].to_numpy(), zctas["lon"].to_numpy())
     treated = list(zctas.loc[d < treated_radius_mi, "zip"])
     excluded = list(zctas.loc[d < exclusion_mi, "zip"])
+    if density_match and "land_sqmi" in zctas:
+        # Urban cores and suburbs diverged after 2020, so only borrow from ZIPs of similar land
+        # area (a cheap density proxy): at most `density_match` x the treated median.
+        cap = density_match * zctas.loc[zctas["zip"].isin(treated), "land_sqmi"].median()
+        excluded = excluded + list(zctas.loc[zctas["land_sqmi"] > cap, "zip"])
     res = synthetic_control(wide, treated, event_date, pre_months=pre, post_months=post_months,
                             exclude_zips=excluded)
     res = placebo_test(wide, zctas, res, event_date, exclude_zips=excluded, pre_months=pre,
                        post_months=post_months, n_placebo=n_placebo, exclusion_mi=exclusion_mi)
-    return res, {"pre_months": pre, "low_confidence": pre < SC_PRE}
+    return res, {"pre_months": pre, "low_confidence": pre < SC_PRE,
+                 "density_matched": bool(density_match)}

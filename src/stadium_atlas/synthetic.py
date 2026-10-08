@@ -55,6 +55,8 @@ class SCResult:
     n_donors: int
     p_value: float | None = None
     n_placebos: int = 0
+    treated_path: pd.Series | None = None    # rel month -> demeaned log value of treated unit
+    synthetic_path: pd.Series | None = None  # rel month -> demeaned log value of counterfactual
 
     def as_dict(self) -> dict:
         return {"effect_pct": self.effect_pct, "pre_rmspe": self.pre_rmspe,
@@ -102,6 +104,7 @@ def synthetic_control(wide: pd.DataFrame, treated_zips, event_date, pre_months: 
         gap=pd.Series(gap, index=rel, name="gap"),
         weights=pd.Series(w[nz], index=np.array(donors)[keep][nz]).sort_values(ascending=False),
         n_treated=len(treated), n_donors=len(donors),
+        treated_path=pd.Series(y, index=rel), synthetic_path=pd.Series(y - gap, index=rel),
     )
 
 

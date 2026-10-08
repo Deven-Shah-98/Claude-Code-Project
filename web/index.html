@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stadium Effect Atlas</title>
+  <meta name="description" content="Did a new stadium move the neighborhood's home values? A synthetic-control atlas of pro sports venues, built on public data." />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar" aria-label="Venues">
+      <header>
+        <h1>Stadium Effect Atlas</h1>
+        <p class="sub">Did a new venue move nearby home values? Compared with a synthetic twin built from the rest of the country.</p>
+        <div class="sort" role="group" aria-label="Sort venues">
+          <button data-sort="effect" class="on">By effect</button>
+          <button data-sort="year">By year</button>
+        </div>
+      </header>
+      <ul id="venue-list"></ul>
+      <footer><button id="about-btn" class="link">How this works &amp; its limits</button></footer>
+    </aside>
+
+    <main id="stage">
+      <div id="map" role="application" aria-label="3D map of home values around the selected venue"></div>
+      <div id="map-hint">Drag to pan · right-drag or Ctrl-drag to tilt · scroll to zoom</div>
+
+      <section id="card" aria-live="polite"></section>
+
+      <div id="timeline">
+        <button id="play" aria-label="Play timeline">▶</button>
+        <div class="track">
+          <div id="open-tick" title="Venue opens"><span>Opens</span></div>
+          <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Time" />
+        </div>
+        <div id="time-label"></div>
+      </div>
+      <div id="legend" aria-label="Color legend">
+        <span>Home value change since opening</span>
+        <div class="ramp"></div>
+        <div class="ticks"><span>−30%</span><span>0</span><span>+30%</span></div>
+      </div>
+      <div id="tooltip" role="tooltip"></div>
+    </main>
+  </div>
+
+  <dialog id="about">
+    <form method="dialog"><button class="close" aria-label="Close">✕</button></form>
+    <h2>How this works</h2>
+    <p><b>Question.</b> After a venue opened, did nearby home values grow faster or slower than they otherwise would have?</p>
+    <p><b>Method.</b> For each venue, ZIP codes within 3 miles are the <i>treated area</i>. A <i>synthetic twin</i> is a weighted blend of ZIP codes from elsewhere in the country (none within 15 miles, matched on land area) chosen to track the treated area's home-value path for the 5 years before opening. The orange line is that twin; the gap after opening is the estimated effect.</p>
+    <p><b>Is it real?</b> The same procedure is run on random areas that have no venue. The placebo p-value is how often one of those looks as extreme as the venue. With 40 placebos the smallest possible p is about 0.024.</p>
+    <p><b>Limits.</b> This is an association, not proof of causation: stadiums are often part of larger redevelopments. Venues opening in 2019–20 are labelled <i>pandemic-confounded</i>. Venues from 2000–02 cannot be scored because the data starts in 2000. Columns show ZIP centroids, not boundaries.</p>
+    <p><b>Data.</b> Zillow Home Value Index (ZHVI) by ZIP · US Census ZCTA gazetteer · Venue locations verified against Wikidata. All public.</p>
+  </dialog>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

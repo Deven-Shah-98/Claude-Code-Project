@@ -23,6 +23,10 @@ def main(argv=None) -> int:
     sy = sub.add_parser("synth", help="synthetic-control estimate + placebo p-value")
     sy.add_argument("--venue", help="venue_id (default: all)")
     sy.add_argument("--placebos", type=int, default=40)
+    ex = sub.add_parser("export", help="write static JSON for the web app")
+    ex.add_argument("--out", default="web/public/data")
+    ex.add_argument("--placebos", type=int, default=40)
+    ex.add_argument("--venue", help="export a single venue_id (default: all)")
     args = p.parse_args(argv)
 
     if args.cmd == "fetch":
@@ -32,6 +36,11 @@ def main(argv=None) -> int:
 
     zhvi, zctas = _load()
     venues = pipeline.load_venues()
+    if args.cmd == "export":
+        from .export import export_all
+
+        export_all(zhvi, zctas, args.out, n_placebo=args.placebos, only=args.venue)
+        return 0
     if args.cmd == "synth":
         return _synth(args, zhvi, zctas, venues)
     if args.venue:
