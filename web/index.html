@@ -14,19 +14,26 @@
       <header>
         <h1>Stadium Effect Atlas</h1>
         <p class="sub">Did a new venue move nearby home values? Compared with a synthetic twin built from the rest of the country.</p>
-        <div class="sort" role="group" aria-label="Sort venues">
-          <button data-sort="effect" class="on">By effect</button>
-          <button data-sort="year">By year</button>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-view="venues" aria-selected="true">Venues</button>
+          <button role="tab" data-view="pooled" aria-selected="false">Big picture</button>
         </div>
       </header>
-      <form id="ask" autocomplete="off">
-        <label for="ask-q" class="eyebrow">Ask the data</label>
-        <div class="ask-row">
-          <input id="ask-q" maxlength="500" placeholder="Which venue had the biggest effect?" />
-          <button type="submit" id="ask-go">Ask</button>
-        </div>
-        <div id="ask-out" aria-live="polite"></div>
+      <form id="zip-form" class="mini" autocomplete="off">
+        <label for="zip-q" class="eyebrow">Find your ZIP</label>
+        <div class="ask-row"><input id="zip-q" inputmode="numeric" maxlength="5" placeholder="e.g. 11217" /><button type="submit">Go</button></div>
+        <div id="zip-out" class="mini-out" aria-live="polite"></div>
       </form>
+      <form id="ask" class="mini" autocomplete="off">
+        <label for="ask-q" class="eyebrow">Ask the data</label>
+        <div class="ask-row"><input id="ask-q" maxlength="500" placeholder="Which venue had the biggest effect?" /><button type="submit" id="ask-go">Ask</button></div>
+        <div id="suggested" class="chips"></div>
+        <div id="ask-out" class="mini-out" aria-live="polite"></div>
+      </form>
+      <div class="filters">
+        <div id="league-chips" class="chips" role="group" aria-label="League"></div>
+        <div class="sort" role="group" aria-label="Sort venues"><button data-sort="effect" class="on">By effect</button><button data-sort="year">By year</button></div>
+      </div>
       <ul id="venue-list"></ul>
       <footer><button id="about-btn" class="link">How this works &amp; its limits</button></footer>
     </aside>
