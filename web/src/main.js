@@ -246,7 +246,7 @@ async function boot() {
     state.sort = b.dataset.sort; document.querySelectorAll('.sort button').forEach((x) => x.classList.toggle('on', x === b)); renderList(); }));
   $('#scrub').addEventListener('input', (e) => setT(Number(e.target.value), true));
   $('#play').addEventListener('click', () => (state.playing ? pause() : play()));
-  if (window.__NO_ASK__) $('#ask').hidden = true;   // static hosts have no /api/ask backend
+  if (window.__NO_ASK__ || location.hostname.endsWith('github.io')) $('#ask').hidden = true;   // static hosts have no /api/ask backend
   $('#ask').addEventListener('submit', onAsk);
   $('#ask-out').addEventListener('click', (e) => { const b = e.target.closest('button[data-id]'); if (b) select(b.dataset.id); });
   $('#about-btn').addEventListener('click', () => $('#about').showModal());
