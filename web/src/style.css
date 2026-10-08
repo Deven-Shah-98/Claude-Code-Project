@@ -17,7 +17,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--surface-0); color: var(--text-primary); }
 button { font: inherit; color: inherit; cursor: pointer; }
-#app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; height: 100dvh; }
+#app { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
 
 /* sidebar */
 #sidebar { background: var(--surface-1); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
