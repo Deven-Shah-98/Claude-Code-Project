@@ -1,0 +1,17 @@
+venue_id,name,team,league,city,state,lat,lon,opened_year,coords_verified,wikidata_qid
+oracle-park,Oracle Park,San Francisco Giants,MLB,San Francisco,CA,37.7786,-122.3893,2000,True,Q298585
+pnc-park,PNC Park,Pittsburgh Pirates,MLB,Pittsburgh,PA,40.4469,-80.0057,2001,True,Q1151177
+lumen-field,Lumen Field,Seattle Seahawks,NFL,Seattle,WA,47.5952,-122.3316,2002,True,Q612736
+great-american,Great American Ball Park,Cincinnati Reds,MLB,Cincinnati,OH,39.0974,-84.5066,2003,True,Q979975
+petco-park,Petco Park,San Diego Padres,MLB,San Diego,CA,32.7073,-117.1566,2004,True,Q1194586
+citizens-bank,Citizens Bank Park,Philadelphia Phillies,MLB,Philadelphia,PA,39.9061,-75.1665,2004,True,Q912770
+nationals-park,Nationals Park,Washington Nationals,MLB,Washington,DC,38.873,-77.0074,2008,True,Q517545
+lucas-oil,Lucas Oil Stadium,Indianapolis Colts,NFL,Indianapolis,IN,39.7601,-86.1639,2008,True,Q867160
+target-field,Target Field,Minnesota Twins,MLB,Minneapolis,MN,44.9817,-93.2776,2010,True,Q1156635
+barclays,Barclays Center,Brooklyn Nets,NBA,Brooklyn,NY,40.6826,-73.9754,2012,True,Q807966
+levis-stadium,Levi's Stadium,San Francisco 49ers,NFL,Santa Clara,CA,37.403,-121.97,2014,True,Q7419343
+truist-park,Truist Park,Atlanta Braves,MLB,Atlanta,GA,33.8908,-84.4678,2017,True,Q17003430
+chase-center,Chase Center,Golden State Warriors,NBA,San Francisco,CA,37.768,-122.3877,2019,True,Q15262098
+sofi-stadium,SoFi Stadium,Los Angeles Rams/Chargers,NFL,Inglewood,CA,33.9535,-118.3392,2020,True,Q19520501
+globe-life-field,Globe Life Field,Texas Rangers,MLB,Arlington,TX,32.7473,-97.0845,2020,True,Q24284037
+allegiant,Allegiant Stadium,Las Vegas Raiders,NFL,Las Vegas,NV,36.0909,-115.1833,2020,True,Q27768421
