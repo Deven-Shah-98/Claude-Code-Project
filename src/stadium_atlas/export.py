@@ -57,7 +57,7 @@ def _quarter_idx(wide: pd.DataFrame, start: pd.Period, end: pd.Period) -> list[p
 
 
 def zip_series(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
-               opening_month: int = 4, years_before: int = 5, years_after: int = 7) -> dict:
+               opening_month: int = 4, years_before: int = 5, years_after: int = 3) -> dict:
     """Quarterly ZIP panel within MAP_RADIUS_MI: value ($k) and % change vs pre-opening level."""
     opened = pd.Period(year=int(venue["opened_year"]), month=opening_month, freq="M")
     qs = _quarter_idx(wide, opened - 12 * years_before, opened + 12 * years_after)
@@ -83,7 +83,7 @@ def zip_series(venue: pd.Series, zctas: pd.DataFrame, wide: pd.DataFrame,
             "opened": f"{opened.year}-{opened.month:02d}"}
 
 
-def chart_series(res: SCResult, step: int = 3, lo: int = -60, hi: int = 48) -> dict:
+def chart_series(res: SCResult, step: int = 3, lo: int = -60, hi: int = 36) -> dict:
     rel = [m for m in res.treated_path.index if lo <= m <= hi and m % step == 0]
     idx = lambda s: [round(float(np.exp(s.loc[m]) * 100), 2) for m in rel]
     return {"months": rel, "actual": idx(res.treated_path), "synthetic": idx(res.synthetic_path)}

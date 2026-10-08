@@ -7,7 +7,7 @@ const CARTO = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 const BLANK = { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0f0f0e' } }] };
 const MILE = 1609.34;
 const RINGS = [1.5, 3, 5, 15];
-const HEIGHT_M_PER_K = 2.2;   // metres of column per $1k of home value
+const HEIGHT_M_PER_K = 0.9;   // metres of column per $1k of home value
 
 const VERDICTS = {
   signal:       { icon: '●', label: 'Statistically distinct', short: 'distinct' },
@@ -54,13 +54,13 @@ function render() {
     layers.push(new ScatterplotLayer({ id: 'rings', data: RINGS.map((r) => ({ r })), getPosition: () => [v.lon, v.lat], getRadius: (x) => x.r * MILE,
       radiusUnits: 'meters', stroked: true, filled: false, getLineColor: [255, 255, 255, 45], lineWidthMinPixels: 1 }));
     if (d) {
-      layers.push(new ColumnLayer({ id: 'zips', data: d.zips, pickable: true, diskResolution: 6, radius: 380, extruded: true, getPosition: (z) => [z.lon, z.lat],
-        getElevation: (z) => z.value_k[t] * HEIGHT_M_PER_K, getFillColor: (z) => colorFor(z.pct[t]), material: { ambient: 0.5, diffuse: 0.7, shininess: 24 },
+      layers.push(new ColumnLayer({ id: 'zips', data: d.zips, pickable: true, diskResolution: 6, radius: 340, extruded: true, getPosition: (z) => [z.lon, z.lat],
+        getElevation: (z) => z.value_k[t] * HEIGHT_M_PER_K, getFillColor: (z) => colorFor(z.exc[t]), material: { ambient: 0.5, diffuse: 0.7, shininess: 24 },
         transitions: { getElevation: 220, getFillColor: 220 }, updateTriggers: { getElevation: [t], getFillColor: [t] },
         onHover: onHover }));
     }
-    layers.push(new ScatterplotLayer({ id: 'venue-glow', data: [v], getPosition: (x) => [x.lon, x.lat], getRadius: 14, radiusUnits: 'pixels', getFillColor: [255, 255, 255, 255], stroked: true, getLineColor: [57, 135, 229, 255], lineWidthMinPixels: 3 }));
-    layers.push(new TextLayer({ id: 'venue-label', data: [v], getPosition: (x) => [x.lon, x.lat], getText: (x) => x.name, getSize: 14, getColor: [255, 255, 255, 255], getPixelOffset: [0, -26], fontWeight: 700, outlineWidth: 4, outlineColor: [15, 15, 14, 255], fontSettings: { sdf: true } }));
+    layers.push(new ScatterplotLayer({ id: 'venue-glow', data: [v], getPosition: (x) => [x.lon, x.lat], getRadius: 14, radiusUnits: 'pixels', getFillColor: [255, 255, 255, 255], stroked: true, getLineColor: [57, 135, 229, 255], lineWidthMinPixels: 3, parameters: { depthTest: false } }));
+    layers.push(new TextLayer({ id: 'venue-label', data: [v], getPosition: (x) => [x.lon, x.lat], getText: (x) => x.name, getSize: 14, getColor: [255, 255, 255, 255], getPixelOffset: [0, -26], fontWeight: 700, outlineWidth: 4, outlineColor: [15, 15, 14, 255], fontSettings: { sdf: true }, parameters: { depthTest: false } }));
   }
   overlay.setProps({ layers });
 }
@@ -69,7 +69,7 @@ function onHover(info) {
   const tip = $('#tooltip');
   if (!info.object) { tip.style.display = 'none'; return; }
   const z = info.object, t = state.t;
-  tip.innerHTML = `<b>ZIP ${z.zip}</b><br>${z.dist.toFixed(1)} mi from venue<br>$${Math.round(z.value_k[t])}k · <b>${fmtPct(z.pct[t])}</b> vs pre-opening`;
+  tip.innerHTML = `<b>ZIP ${z.zip}</b><br>${z.dist.toFixed(1)} mi from venue<br>$${Math.round(z.value_k[t])}k · ${fmtPct(z.pct[t])} since pre-opening<br><b>${fmtPct(z.exc[t])}</b> vs. synthetic twin`;
   tip.style.display = 'block';
   tip.style.left = `${info.x + 14}px`; tip.style.top = `${info.y + 14}px`;
 }
@@ -95,6 +95,7 @@ function renderCard() {
     ${sc ? `<div class="hero"><span class="num">${fmtPct(sc.effect_pct)}</span><span class="cap">vs. synthetic twin,<br>3 years after opening</span></div>
     <span class="chip ${v.verdict === 'signal' ? 'signal' : ''}"><i>${V.icon}</i> ${V.label}</span>
     <p class="pval">Placebo p = <b>${p.toFixed(3)}</b> — about ${Math.max(1, Math.round(p * sc.n_placebos))} in ${sc.n_placebos} random areas with no venue looked this extreme. Pre-opening fit error ${(sc.pre_rmspe * 100).toFixed(2)}%, ${sc.n_treated} ZIPs treated.</p>
+    ${v.robustness ? `<p class="pval">Robustness check — density-matched donors: <b>${fmtPct(v.robustness.effect_pct)}</b> (placebo p = ${v.robustness.p_value.toFixed(3)}, ${v.robustness.n_donors.toLocaleString()} donors). The estimate moves with the comparison pool.</p>` : ''}
     <div class="chart" id="chart"></div>`
     : `<span class="chip"><i>${V.icon}</i> ${V.label}</span><p class="pval">${v.error || ''}</p>`}
     ${v.caveats.length ? `<ul class="caveats">${v.caveats.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
@@ -185,16 +186,31 @@ function play() {
 }
 function pause() { state.playing = false; clearInterval(state.timer); $('#play').textContent = '▶'; $('#play').setAttribute('aria-label', 'Play timeline'); }
 
+// ---------- growth relative to the synthetic twin ----------
+function interp(xs, ys, x) {
+  if (x <= xs[0]) return ys[0]; if (x >= xs.at(-1)) return ys.at(-1);
+  let i = 0; while (xs[i + 1] < x) i++;
+  return ys[i] + ((ys[i + 1] - ys[i]) * (x - xs[i])) / (xs[i + 1] - xs[i]);
+}
+function addExcess(d, v) {
+  const [oy, om] = d.opened.split('-').map(Number), { months, synthetic } = v.chart;
+  const s0 = interp(months, synthetic, -6.5);   // matches the 12-month pre-opening baseline used for ZIPs
+  const twin = d.quarters.map((q) => { const [y, m] = q.split('-').map(Number); return interp(months, synthetic, (y - oy) * 12 + (m - om)) / s0; });
+  d.zips.forEach((z) => { z.exc = z.pct.map((p, t) => ((1 + p / 100) / twin[t] - 1) * 100); });
+}
+
 // ---------- selection ----------
 async function select(id) {
   pause();
   const v = state.venues.find((x) => x.id === id); state.sel = v; state.data = null; renderList(); renderCard(); render();
-  map.flyTo({ center: [v.lon, v.lat], zoom: 10.6, pitch: 58, bearing: -18, duration: 2200, essential: true });
+  const wide = window.innerWidth > 900;
+  map.flyTo({ center: [v.lon, v.lat], zoom: wide ? 10.6 : 10, pitch: 58, bearing: -18, duration: 2200, essential: true,
+    padding: wide ? { right: 420, bottom: 70, top: 0, left: 0 } : { bottom: 360, top: 0, left: 0, right: 0 } });
   try {
     const res = await fetch(`data/venues/${id}.json`);
     if (!res.ok) throw new Error(res.status);
     const d = await res.json(); if (state.sel?.id !== id) return;
-    state.data = d;
+    state.data = d; addExcess(d, v);
     const sc = $('#scrub'); sc.max = d.quarters.length - 1;
     const oi = d.quarters.findIndex((q) => q >= d.opened); const frac = Math.max(0, oi) / (d.quarters.length - 1);
     $('#open-tick').style.left = `calc(${frac * 100}% * (1 - 16px / 100%) + 8px)`;

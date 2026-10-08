@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stadium Effect Atlas</title>
   <meta name="description" content="Did a new stadium move the neighborhood's home values? A synthetic-control atlas of pro sports venues, built on public data." />
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -37,7 +38,7 @@
         <div id="time-label"></div>
       </div>
       <div id="legend" aria-label="Color legend">
-        <span>Home value change since opening</span>
+        <span>Growth vs. synthetic twin</span>
         <div class="ramp"></div>
         <div class="ticks"><span>−30%</span><span>0</span><span>+30%</span></div>
       </div>
@@ -49,7 +50,7 @@
     <form method="dialog"><button class="close" aria-label="Close">✕</button></form>
     <h2>How this works</h2>
     <p><b>Question.</b> After a venue opened, did nearby home values grow faster or slower than they otherwise would have?</p>
-    <p><b>Method.</b> For each venue, ZIP codes within 3 miles are the <i>treated area</i>. A <i>synthetic twin</i> is a weighted blend of ZIP codes from elsewhere in the country (none within 15 miles, matched on land area) chosen to track the treated area's home-value path for the 5 years before opening. The orange line is that twin; the gap after opening is the estimated effect.</p>
+    <p><b>Method.</b> For each venue, ZIP codes within 3 miles are the <i>treated area</i>. A <i>synthetic twin</i> is a weighted blend of ZIP codes from elsewhere in the country (none within 15 miles, matched on land area) chosen to track the treated area's home-value path for the 5 years before opening. The orange line is that twin; the gap after opening is the estimated effect. On the map, each column's color shows how much faster (blue) or slower (red) that ZIP grew than the twin would have.</p>
     <p><b>Is it real?</b> The same procedure is run on random areas that have no venue. The placebo p-value is how often one of those looks as extreme as the venue. With 40 placebos the smallest possible p is about 0.024.</p>
     <p><b>Limits.</b> This is an association, not proof of causation: stadiums are often part of larger redevelopments. Venues opening in 2019–20 are labelled <i>pandemic-confounded</i>. Venues from 2000–02 cannot be scored because the data starts in 2000. Columns show ZIP centroids, not boundaries.</p>
     <p><b>Data.</b> Zillow Home Value Index (ZHVI) by ZIP · US Census ZCTA gazetteer · Venue locations verified against Wikidata. All public.</p>

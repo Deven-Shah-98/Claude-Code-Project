@@ -10,23 +10,36 @@ How do pro sports venues (and winning) relate to nearby housing markets? Public 
 | Venues | `data/seed/venues.csv` (hand-curated; coordinates **unverified**, to be checked against OSM/Wikidata) |
 
 ## Method
-For each venue, ZIP centroids are bucketed into distance rings (0-1.5, 1.5-3, 3-5 mi) with a 5-15 mi
-control donut. We estimate a difference-in-differences on log home values (3 years before vs. months
-25-36 after opening) with a bootstrap CI over ZIPs, plus a pre-trend diagnostic. This is an association,
-not proof of causation: stadiums are often built where redevelopment is already underway.
+For each venue, ZIPs within 3 miles are the treated area. A **synthetic twin** is a convex blend of ZIPs
+from elsewhere (none within 15 miles) fitted to the treated area's home-value path over the 60 months
+before opening. The post-opening gap (months 25-36) is the estimate. Inference is by **in-space placebos**:
+the same procedure on random geographic clusters with no venue (p = share at least as extreme).
+A **density-matched** re-run (donors limited to similar ZIP land area) is a sensitivity check.
+
+Verdicts: *signal* (placebo p <= 0.05, enough history), *suggestive*, *inconclusive*,
+*pandemic-confounded* (opened 2019+), *no data* (Zillow starts in 2000; too little pre-period).
+
+Calibration (simulation, 25 null worlds): placebo false-positive rate 4% at nominal 10%.
+Pre-periods under 60 months were biased by roughly -2 points in simulation, hence the 60-month default.
+
+## Current findings (read the caveats)
+Only **Barclays Center** (+31.7%, placebo p = 0.024) is flagged; with density-matched donors it is
++18.1% (p = 0.098), so the size depends on the comparison pool and Brooklyn's wider redevelopment
+is not separated out. Chase Center's -18.6% is flagged **pandemic-confounded**, not a stadium effect.
+Everything else is inconclusive. An earlier difference-in-differences with a suburban control ring
+produced several large "effects" that disappeared under the synthetic control.
 
 ## Usage
 ```
 pip install -e ".[dev]"
-atlas fetch              # download raw data to data/raw
-atlas score              # effect table for all seeded venues
-atlas score --venue oracle-park
-pytest
+atlas fetch                          # download Zillow + Census data to data/raw
+atlas synth                          # synthetic-control table for all venues
+atlas export --out web/public/data   # JSON for the web app (about 20 min)
+cd web && npm install && npm run dev
 ```
 
 ## Roadmap
-1. ~~Pipeline, ring assignment, DiD + event study, tests~~
-2. Real-data run and venue coordinate verification
-3. Synthetic-control comparison
-4. 3D time-lapse map (MapLibre/deck.gl) and event-study charts
-5. Natural-language query layer
+1. ~~Pipeline, DiD, synthetic control, placebo inference, verification, 3D web app~~
+2. Pandemic-robust comparison for 2019-20 venues (urban-core donors from census density)
+3. Natural-language query layer (Claude API over the exported results)
+4. More leagues, NBA/NHL venues, team success overlays (championships)
