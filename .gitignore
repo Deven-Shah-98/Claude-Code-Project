@@ -6,3 +6,4 @@ data/processed/
 *.duckdb
 node_modules/
 web/dist/
+dist-single/
